@@ -1,0 +1,6 @@
+DOMAIN,vpp.itunes.apple.com,REJECT
+DOMAIN,appattest.apple.com,REJECT
+DOMAIN,certs.apple.com,REJECT
+DOMAIN,crl.entrust.net,REJECT
+DOMAIN,valid.apple.com,REJECT
+DOMAIN,oscp2.appe.com,REJECT
