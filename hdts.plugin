@@ -1,0 +1,20 @@
+#!name=忙豆聽書
+#!desc= 破解付費章節+去廣告
+#!icon= https://raw.githubusercontent.com/snowyen0909/loon-/refs/heads/main/hdts.png
+
+[Rewrite]
+# > 去广告
+^https?://case-cdn\.oceanplayable\.com - reject
+^https?://ios\.bugly\.qq\.com - reject
+^https?://ulogs\.um.*\.com - reject
+^https?://token\.safebrowsing\.apple - reject
+^https?://toblog\.ctobsnssdk\.com - reject
+
+[Script]
+# > 忙豆听书 解锁付费听书购买
+http-response ^https?:\/\/md.liaoliaoy.com\/listen\/api\/getUserInfo script-path=https://raw.githubusercontent.com/WeiGiegie/666/main/hdts.js, requires-body=true, timeout=60, tag=hdts
+
+http-request ^https?:\/\/md.liaoliaoy.com\/listen\/api\/(buyBookInit|buyCard|batchBuyChapter|bookChapter|getNextChapter).*$ script-path=https://raw.githubusercontent.com/WeiGiegie/666/main/hdtsck.js, requires-body=true, timeout=60, tag=hdtsck
+
+[MITM]
+hostname = md.liaoliaoy.com, www.yueliangfm.com, ios.bugly.qq.com, ulogs.umeng.com, ulogs.umengcloud.com, *toutiao.com, toblog.ctobsnssdk.com, token.safebrowsing.apple
