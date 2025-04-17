@@ -2,11 +2,11 @@
 #!desc= VidSheep 视频聚合 - 使用代理工具配合脚本提供视频观影一站式服务
 #!author=@Sheepfj[https://t.me/sheep_007xiaoyang]
 #!icon=https://github.com/Toperlock/Quantumult/raw/main/icon/Doraemon/Doraemon-1005.png
- #!openUrl= https://api.sheep.com/sheep/videoPolymerization/
+#!openUrl= https://api.sheep.com/sheep/videoPolymerization/
 
 [Script]
-http-response ^https:\/\/api\.sheep\.com\/sheep\/videoPolymerization\/(?:zhanshi\/sheep_vod_info_(\d+)|videoword\/([^\/]+)|) script-path=https://raw.githubusercontent.com/SheepFJ/VidSheep/main/VidSheep/main/mainlogic.js, tag=VidSheep
-
+http-response ^https:\/\/api\.sheep\.com\/sheep\/videoPolymerization\/?$ script-path=https://raw.githubusercontent.com/SheepFJ/VidSheep69/refs/heads/main/main/mainlogic.js,requires-body=false,tag=VidSheep
+http-response ^https:\/\/api\.sheep\.com\/sheep\/videoPolymerization\/(api|userinfo\/username\/([^\/]+)|videoword\/([^\/]+)\/\?wd=([^\/]+)|videolist\/([^\/]+)) script-path=https://raw.githubusercontent.com/SheepFJ/VidSheep69/refs/heads/main/main/api.js,requires-body=false,tag=VidSheepApi
 [MITM]
 hostname = api.sheep.com
 
