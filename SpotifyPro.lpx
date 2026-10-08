@@ -1,0 +1,43 @@
+#!name = Spotify
+#!desc = 移除 Spotify 廣告並解鎖部分 Premium 功能。音質無法設定為「極高」。下方兩個 Protobuf 腳本只能擇一啟用，請勿同時開啟。啟用插件後請重新登入，以套用完整設定。
+#!openUrl = https://loon-plugins.vercel.app
+#!author = devchristian1337
+#!tag = Spotify, 去廣告, Premium
+#!loon_version = 3.3.4(898)
+#!homepage = https://github.com/devchristian1337/loon-plugins/blob/main/README.md
+#!icon = https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/App-Icons/spotify.png
+#!date = 2026-10-07
+
+[Argument]
+spot-ev3-enable = switch,true,false,tag=本地設定覆寫,desc=在本地修改 bootstrap/customize 的 Protobuf 資料（建議使用）
+spot-ev1-enable = switch,false,true,tag=遠端設定修改,desc=另一種 Protobuf 修改方式，請勿與「本地設定覆寫」同時啟用
+
+[Rule]
+AND,((DOMAIN-SUFFIX, spotify.com), (PROTOCOL, QUIC)),REJECT
+
+DOMAIN,aet.spotify.com,REJECT
+
+[Rewrite]
+^https:\/\/(spclient\.wg\.spotify\.com|.*-spclient\.spotify\.com(:443)?)\/user-customization-service\/v1\/customize header-del if-none-match
+^https:\/\/(spclient\.wg|.*-spclient)\.spotify\.com(:443)?\/pendragon reject-dict
+
+# 隱藏「播放中」畫面的探索推薦動態（個人偏好）
+^https:\/\/(spclient\.wg|.*-spclient)\.spotify\.com(:443)?\/watch-feed-entrypoints\/v.\/discovery-from-seed reject-dict
+
+# 隱藏設定中的會員資訊（僅影響顯示，可自行移除）
+^https:\/\/.*-spclient\.spotify\.com(:443)?\/pam-view-service\/ reject-dict
+
+# 封鎖 AI DJ 網址
+37i9dQZF1EYkqdzj48dyYq reject-dict
+
+[Mitm]
+hostname = spclient.wg.spotify.com, *spclient.spotify.com
+
+[Script]
+http-request ^https:\/\/(.*-spclient\.spotify\.com(:443)?|spclient\.wg\.spotify\.com)\/gabo-receiver-service script-path=https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/Spotify/spot-gabo.js, timeout=10, tag=Spotify Gabo 請求處理
+
+http-response ^https:\/\/(spclient\.wg\.spotify\.com|.*-spclient\.spotify\.com(:443)?)\/browsita\/v.\/browse script-path=https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/Spotify/spot-NoSearchAd.js, requires-body=true, binary-body-mode=true, timeout=10, tag=Spotify 搜尋廣告過濾
+http-response ^https:\/\/(spclient\.wg\.spotify\.com|.*-spclient\.spotify\.com(:443)?)\/casita\/v.\/home\/default script-path=https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/Spotify/spot-NoHomeAd.js, requires-body=true, binary-body-mode=true, timeout=10, tag=Spotify 首頁廣告過濾
+http-response ^https:\/\/(spclient\.wg\.spotify\.com|.*-spclient\.spotify\.com(:443)?)\/scrollsita\/v.\/scroll\/spotify script-path=https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/Spotify/spot-NoScrollAd.js, requires-body=true, binary-body-mode=true, timeout=10, tag=Spotify 捲動內容廣告過濾
+http-response ^https:\/\/(spclient\.wg\.spotify\.com|.*-spclient\.spotify\.com(:443)?)\/(bootstrap\/v1\/bootstrap|user-customization-service\/v1\/customize)(\?.*)?$ script-path=https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/Spotify/spot-proto-eevee.js, requires-body=true, binary-body-mode=true, timeout=10, tag=Spotify Protobuf（遠端）, enable={spot-ev1-enable}
+http-response ^https:\/\/(spclient\.wg\.spotify\.com|.*-spclient\.spotify\.com(:443)?)\/(bootstrap\/v1\/bootstrap|user-customization-service\/v1\/customize)(\?.*)?$ script-path=https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/Spotify/spot-proto-ev3.js, requires-body=true, binary-body-mode=true, timeout=10, tag=Spotify Protobuf（本地）, enable={spot-ev3-enable}
