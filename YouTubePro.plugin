@@ -2,7 +2,7 @@
 #!name = YouTube 去廣告（繁中合併版）
 #!desc = 移除 YouTube App 廣告，支援隱藏 Shorts 分頁與其他介面項目、自動最高畫質、精彩跳轉、背景播放，並翻譯現有字幕（目標語言為簡體中文或美式英文；無字幕的影片無法翻譯）。記錄功能預設僅擷取媒體回應標頭，完整取樣可能造成延遲。需啟用 MITM 並信任憑證。
 #!openUrl = https://loon-plugins.vercel.app
-#!author = devchristian1337
+#!author = devchristian1337Maasea[https://github.com/Maasea/sgmodule], gholts[https://github.com/gholts/surge], RuCu6[https://github.com/RuCu6]
 #!tag = YouTube, 去廣告
 #!loon_version = 3.5.1(983)
 #!homepage = https://github.com/devchristian1337/loon-plugins/blob/main/README.md
