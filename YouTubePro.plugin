@@ -1,0 +1,83 @@
+# 合併版：原版 devchristian1337 + Maasea/gholts/RuCu6 功能；遠端腳本版本更新可能影響相容性
+#!name = YouTube 去廣告（繁中合併版）
+#!desc = 移除 YouTube App 廣告，支援隱藏 Shorts 分頁與其他介面項目、自動最高畫質、精彩跳轉、背景播放，並翻譯現有字幕（目標語言為簡體中文或美式英文；無字幕的影片無法翻譯）。記錄功能預設僅擷取媒體回應標頭，完整取樣可能造成延遲。需啟用 MITM 並信任憑證。
+#!openUrl = https://loon-plugins.vercel.app
+#!author = devchristian1337
+#!tag = YouTube, 去廣告
+#!loon_version = 3.5.1(983)
+#!homepage = https://github.com/devchristian1337/loon-plugins/blob/main/README.md
+#!icon = https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/App-Icons/youtube.png
+#!date = 2026-10-07
+
+[Argument]
+background_playback = switch,false,tag=背景播放,desc=切換 App 或鎖定螢幕後，仍可繼續播放一般影片的聲音。直播和受限制內容是否支援，仍由 YouTube 決定
+playback_region = select,"original","CN","HK","TW","US","JP","KR","SG","GB","DE","RU",tag=播放請求地區,desc=original 表示維持目前地區。此選項只會修改用戶端的 gl 參數，不會改變出口 IP；對廣告封鎖效果的影響仍待驗證
+translation_enabled = switch,false,tag=字幕翻譯,desc=將影片已有的字幕翻譯成指定語言。關閉後維持原本的字幕請求
+translation_target = select,"zh-CN","en-US",tag=字幕目標語言,desc=只能轉換現有字幕（簡體中文 zh-CN 或美式英文 en-US）。沒有字幕的影片無法翻譯；音軌、標題及影片說明不會變更
+autoHd = switch,false,tag=自動最高畫質,desc=嘗試自動選擇 YouTube 可用的最高畫質（新版腳本）
+blockGames = switch,false,tag=隱藏內建遊戲,desc=隱藏 YouTube 內建遊戲入口（新版腳本）
+blockShorts = switch,false,tag=隱藏 Shorts 短影音,desc=使用新插件的處理方式隱藏 Shorts 按鈕，而不只是首頁短影音區塊
+blockStore = switch,false,tag=隱藏商品櫥窗,desc=隱藏影片下方及頻道首頁的商品推廣區塊（新版腳本）
+blockUpload = switch,false,tag=隱藏上傳按鈕,desc=隱藏 YouTube 上傳按鈕（新版腳本）
+blockVerticalLive = switch,false,tag=隱藏直式直播,desc=隱藏 YouTube 首頁的直式直播內容（新版腳本）
+jumpAhead = switch,false,tag=啟用精彩跳轉,desc=嘗試解鎖 YouTube 精彩跳轉 Jump Ahead 按鈕（新版腳本）
+blocked_channels = input,"",tag=封鎖頻道,desc=輸入頻道 ID、@帳號代稱或完整頻道名稱，以空格分隔。建議優先使用頻道 ID；名稱含空格時請使用帳號代稱或 ID。留空表示停用；僅能隱藏可辨識所屬頻道的影片
+blocked_channels_url = input,"",tag=遠端封鎖頻道清單網址,desc=填入可公開存取的 HTTPS 純文字直連網址（例如 GitHub Raw）。本機快取每小時更新一次，也可手動執行更新腳本；會與手動封鎖清單合併。留空表示停用
+log_enabled = switch,false,tag=日誌記錄工具,desc=首次符合條件的請求出現時自動啟動，並提示日誌入口。關閉後，下次 API 請求會清除日誌並停止取樣；如需保留請先匯出。完整取樣可能造成延遲
+quality_research = switch,false,tag=畫質研究取樣,desc=只有啟用日誌記錄工具時才會運作。記錄可辨識的畫質與格式參數，並讀取少量媒體 POST 請求以供比較；不會自動切換畫質
+media_capture_mode = select,"headers","full",tag=媒體取樣模式,desc=僅在日誌記錄開啟時生效，關閉日誌時會自動停用。headers 僅記錄回應標頭；full 會讀取完整回應供開發分析，可能造成延遲
+log_level = select,"info","debug","warn","error",tag=日誌詳細程度,desc=info 保留完整且已遮蔽敏感資訊的記錄；error 僅保留錯誤；debug 保留除錯等級記錄；warn 保留警告與錯誤
+capture_budget = select,"32","16","64",tag=日誌容量上限（MB）,desc=達到容量上限時會停止記錄，已擷取的資料會保留；匯出後再清除
+
+[Rule]
+# 讓 API 與播放協商從 QUIC 改走 TCP，方便 MITM 與腳本檢查；不會拒絕一般媒體內容。
+AND,((DOMAIN,youtubei.googleapis.com),(PROTOCOL,UDP),(DEST-PORT,443)),REJECT
+AND,((DOMAIN,youtubei-att.googleapis.com),(PROTOCOL,UDP),(DEST-PORT,443)),REJECT
+# 比對 googlevideo 網域及子網域的 QUIC 流量，並以 UDP/443 規則作為備援。
+AND,((DOMAIN-SUFFIX,googlevideo.com),(PROTOCOL,QUIC)),REJECT
+AND,((DOMAIN-SUFFIX,googlevideo.com),(PROTOCOL,UDP),(DEST-PORT,443)),REJECT
+
+[Rewrite]
+# 僅針對 YouTube App 的初始化 POST 請求回傳 Loon 內建空白影片；不讀取內容，也不影響一般媒體。
+# 更新於 2026-10-05：取代先前失敗的 HTTP 204 測試；播放備援恢復仍需實機確認。
+request if ${url} ~= /^https:\/\/[a-z0-9-]+\.googlevideo\.com\/initplayback(?:\?[^#]*)?$/i && ${request.method} == "POST" && ${request.header['User-Agent']} ~= /(?:^|\s)com\.google\.ios\.youtube\//i then reject_video(200)
+# 清除媒體來源的替代連線提示，減少拒絕 QUIC 後的重試；僅修改回應標頭。
+# 更新於 2026-10-05：實際啟動延遲仍需實機確認；用戶端可能透過其他方式探索 HTTP/3。
+^https://(?:[\w-]+\.)*googlevideo\.com(?::443)?/ response-header-replace Alt-Svc clear
+
+[Script]
+# 獨立更新頻道清單快取；動態腳本只讀取快取，不會等待遠端下載。
+# 更新於 2026-10-07
+cron "0 * * * *" script-path=https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/YouTube/request.min.js,timeout=10,argument=[{blocked_channels_url}],tag=YouTube 定時更新封鎖頻道
+generic script-path=https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/YouTube/request.min.js,timeout=10,argument=[{blocked_channels_url}],tag=YouTube 手動更新封鎖頻道,img-url=person.crop.circle.badge.xmark.system
+http-request ^https:\/\/(?:www\.|m\.)?youtube\.com\/api\/timedtext\?[^#]+$ script-path=https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/YouTube/request.min.js,requires-body=false,timeout=10,enable={translation_enabled},argument=[{translation_enabled},{translation_target}],tag=YouTube 字幕目標語言
+# 僅在明確啟用日誌與畫質研究時讀取 videoplayback POST；不處理初始化空白影片。
+# 更新於 2026-10-07：必須在一般日誌規則之前符合；預設不緩衝請求內容。
+request if ${url} ~= /^https:\/\/[\w-]+\.googlevideo\.com\/videoplayback(?:\?[^#]*)?$/i && ${request.method} == "POST" && ${log_enabled} == true && ${quality_research} == true then script("https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/YouTube/request.min.js", {${log_enabled}, ${log_level}, ${capture_budget}, ${quality_research}}) with requires_body=true, binary_body_mode=true, timeout=10, tag="YouTube 畫質研究請求取樣"
+http-request ^https:\/\/(?:youtubei(?:-att)?\.googleapis\.com|(?:www\.|m\.|music\.)?youtube\.com)\/youtubei\/v1\/(?:browse|next|search|reel\/reel_watch_sequence)(?:\?[^#]*)?$|^https:\/\/[\w-]+\.googlevideo\.com\/videoplayback\?[^#]*$|^http:\/\/youtube-logs\.invalid(?::80)?(?:\/[^#]*)?$|^https:\/\/[\w-]+\.googlevideo\.com\/initplayback(?:\?[^#]*)?$ script-path=https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/YouTube/request.min.js,requires-body=false,timeout=10,enable={log_enabled},argument=[{log_enabled},{log_level},{capture_budget},{background_playback},{media_capture_mode},{quality_research}],tag=YouTube 日誌記錄與匯出
+http-request ^https:\/\/(?:youtubei(?:-att)?\.googleapis\.com|(?:www\.|m\.)?youtube\.com)\/youtubei\/v1\/log_event(?:\?[^#]*)?$ script-path=https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/YouTube/request.min.js,requires-body=true,binary-body-mode=true,timeout=10,argument=[{log_enabled},{log_level},{capture_budget},{playback_region}],tag=YouTube 設定請求處理
+# 媒體取樣受日誌總開關控制。關閉時 headers 和 full 均不執行；保留的模式設定不代表取樣正在運作。
+# 必須在收到回應內容前選擇完整取樣。同一回應只執行第一個符合的腳本；預設標頭規則不傳入 full，以免誤讀完整內容。
+response if ${url} ~= /^https:\/\/[\w-]+\.googlevideo\.com\/(?:videoplayback|initplayback)(?:\?[^#]*)?$/i && ${log_enabled} == true && ${media_capture_mode} == "full" then script("https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/YouTube/response.min.js", {${log_enabled}, ${log_level}, ${capture_budget}, ${media_capture_mode}}) with requires_body=true, binary_body_mode=true, timeout=30, tag="YouTube 完整媒體開發取樣"
+http-response ^https:\/\/[\w-]+\.googlevideo\.com\/(?:videoplayback|initplayback)(?:\?[^#]*)?$ script-path=https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/YouTube/response.min.js,requires-body=false,timeout=10,enable={log_enabled},argument=[{log_enabled},{log_level},{capture_budget}],tag=YouTube 媒體回應記錄
+http-response ^https:\/\/(?:youtubei(?:-att)?\.googleapis\.com|(?:www\.|m\.)?youtube\.com)\/youtubei\/v1\/(?:config|log_event)(?:\?[^#]*)?$ script-path=https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/YouTube/response.min.js,requires-body=true,binary-body-mode=true,timeout=10,argument=[{log_enabled},{log_level},{capture_budget}],tag=YouTube Onesie 設定快取
+
+http-request ^https:\/\/(?:youtubei(?:-att)?\.googleapis\.com|(?:www\.|m\.|music\.)?youtube\.com)\/youtubei\/v1\/(?:player|get_watch)(?:\?[^#]*)?$|^https:\/\/(?:youtubei(?:-att)?\.googleapis\.com|(?:www\.|m\.|music\.)?youtube\.com)\/youtubei\/v1\/player\/ad_break(?:\?[^#]*)?$ script-path=https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/YouTube/request.min.js,requires-body=true,binary-body-mode=true,timeout=10,argument=[{log_enabled},{log_level},{capture_budget},{playback_region}],tag=YouTube 播放請求與廣告設定處理
+
+# 新版介面處理使用獨立的回應端點，避免與原插件的封鎖頻道、背景播放功能重複執行。
+# 啟用任一新版介面隱藏功能時，首頁／搜尋動態改由新腳本處理；此時原封鎖頻道清單不會在相同回應上生效。
+response if ${url} ~= /^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/(?:browse|next|search)(?:\?.*)?$/i && (${blockShorts} == true || ${blockGames} == true || ${blockStore} == true || ${blockUpload} == true || ${blockVerticalLive} == true) then script("https://rucu6.pages.dev/Scripts/youtube/response_gholts.js", {${autoHd}, ${blockGames}, ${blockShorts}, ${blockStore}, ${blockUpload}, ${blockVerticalLive}, ${jumpAhead}}) with tag="YouTube 新版首頁與 Shorts 處理", requires_body=true, binary_body_mode=true
+# 導覽與設定頁面僅由新版腳本處理。
+response if ${url} ~= /^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/(?:navigation\/resolve_url|guide|account\/get_setting)(?:\?.*)?$/i then script("https://rucu6.pages.dev/Scripts/youtube/response_gholts.js", {${autoHd}, ${blockGames}, ${blockShorts}, ${blockStore}, ${blockUpload}, ${blockVerticalLive}, ${jumpAhead}}) with tag="YouTube 新版導覽及介面設定", requires_body=true, binary_body_mode=true
+# 精彩跳轉使用新版播放回應；關閉後保留原插件的背景播放回應處理。
+response if ${url} ~= /^https:\/\/youtubei\.googleapis\.com\/youtubei\/v1\/(?:player|get_watch|reel\/reel_watch_sequence)(?:\?.*)?$/i && ${jumpAhead} == true then script("https://rucu6.pages.dev/Scripts/youtube/response_gholts.js", {${autoHd}, ${blockGames}, ${blockShorts}, ${blockStore}, ${blockUpload}, ${blockVerticalLive}, ${jumpAhead}}) with tag="YouTube 精彩跳轉播放處理", requires_body=true, binary_body_mode=true
+# 自動畫質於未開啟原日誌記錄時處理媒體請求；原始初始化播放及廣告攔截規則保持不變。
+request if ${url} ~= /^https?:\/\/[\w-]+\.googlevideo\.com\/videoplayback(?:\?.*)?$/i && ${autoHd} == true && ${log_enabled} == false then script("https://rucu6.pages.dev/Scripts/youtube/request_gholts.js", {${autoHd}}) with tag="YouTube 自動最高畫質", requires_body=true, binary_body_mode=true
+
+response if ${url} ~= /^https:\/\/(?:youtubei(?:-att)?\.googleapis\.com|(?:www\.|m\.|music\.)?youtube\.com)\/youtubei\/v1\/(?:browse|next|search)(?:\?[^#]*)?$/i && ${blockShorts} == false && ${blockGames} == false && ${blockStore} == false && ${blockUpload} == false && ${blockVerticalLive} == false then script("https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/YouTube/response.min.js", {${log_enabled}, ${log_level}, ${capture_budget}, false, ${blocked_channels}, ${blocked_channels_url}}) with requires_body=true, binary_body_mode=true, timeout=10, tag="YouTube 原版動態廣告與封鎖頻道處理"
+response if ${url} ~= /^https:\/\/(?:youtubei(?:-att)?\.googleapis\.com|(?:www\.|m\.|music\.)?youtube\.com)\/youtubei\/v1\/(?:player|get_watch|reel\/reel_watch_sequence)(?:\?[^#]*)?$/i && ${jumpAhead} == false then script("https://raw.githubusercontent.com/devchristian1337/loon-plugins/refs/heads/main/Scripts/YouTube/response.min.js", {${log_enabled}, ${log_level}, ${capture_budget}, ${background_playback}, ${quality_research}}) with requires_body=true, binary_body_mode=true, timeout=10, tag="YouTube 原版播放與背景播放處理"
+
+[Mitm]
+hostname = s.youtube.com, youtubei.googleapis.com, youtubei-att.googleapis.com, youtube.com, www.youtube.com, m.youtube.com, music.youtube.com, *.googlevideo.com
+# 關閉日誌時，初始化及一般媒體回應都不會執行內容取樣腳本。初始化 POST 由原生空白影片重寫處理；一般播放請求仍會清理廣告協商資訊。
+# googlevideo UDP 僅改由 TCP 連線，一般 videoplayback 媒體請求仍可正常通過。
